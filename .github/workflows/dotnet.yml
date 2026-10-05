@@ -1,0 +1,26 @@
+name: Publish
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - v**
+
+permissions:
+  contents: write
+
+jobs:
+  network-validation:
+    uses: ./.github/workflows/network-validation.yml
+  publish:
+    needs: network-validation
+    name: Publish
+    uses: tryAGI/workflows/.github/workflows/generated-sdk-publish.yml@main
+    with:
+      project-path: src/libs/Muse/Muse.csproj
+      auto-stable-release: false
+      enable-caching: false
+      additional-test-arguments: '--logger GitHubActions --filter "TestCategory!=Live&TestCategory!=LiveProbe&TestCategory!=Interop"'
+    secrets:
+      nuget-key: ${{ secrets.NUGET_KEY }}

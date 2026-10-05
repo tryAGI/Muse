@@ -1,0 +1,61 @@
+site_name: Muse .NET Documentation
+site_description: Documentation for the tryAGI .NET SDK for Muse.
+site_url: https://tryAGI.github.io/Muse/
+repo_url: https://github.com/tryAGI/Muse
+repo_name: tryAGI/Muse
+edit_uri: edit/main/docs/
+nav:
+- Overview: index.md
+- Guides:
+  - Network protocol: PROTOCOL.md
+  - Validation and limitations: VALIDATION.md
+# EXAMPLES:START
+- Examples:
+  - Discover authorized VMs: examples/discover-vms.md
+# EXAMPLES:END
+
+theme:
+  name: tryagi
+  favicon: 'media/icon128.png'
+
+plugins:
+  - search
+  - copy-to-llm
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - meta
+  - toc:
+      permalink: ""
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower, percent_encode: true}}
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - pymdownx.highlight:
+      linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.progressbar
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: math
+          class: arithmatex
+          format: !!python/object/apply:pymdownx.arithmatex.arithmatex_fenced_format {kwds: {mode: mathjax}}
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.tabbed:
+      alternate_style: true

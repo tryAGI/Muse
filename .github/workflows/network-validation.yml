@@ -1,0 +1,30 @@
+name: Network validation
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Unit and HTTP contract tests
+        run: dotnet test Muse.slnx -c Release --filter 'TestCategory!=Live&TestCategory!=LiveProbe&TestCategory!=Interop'
+      - name: Independent protocol interoperability
+        run: bash scripts/test-interop.sh
+      - name: NativeAOT build
+        run: dotnet publish src/tests/NativeAotSmoke/NativeAotSmoke.csproj -c Release -r linux-x64 -o artifacts/nativeaot -p:GeneratePackageOnBuild=false
+      - name: NativeAOT network interoperability
+        run: bash scripts/test-interop.sh artifacts/nativeaot/NativeAotSmoke
+      - name: Verify generated sources
+        run: |
+          bash src/libs/Muse/generate.sh
+          git diff --exit-code -- src/libs/Muse/Generated

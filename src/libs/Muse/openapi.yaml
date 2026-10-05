@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  title: Muse Gadget Device API
+  version: '2026-10-05'
+  description: >-
+    Community-maintained contract derived from facebookincubator/muse-gadget-sdk
+    at 74a5e2d7fc895f109f83a9a1dbed705dbcd8b1ff. Not an official public API guarantee.
+    SDK tokens identify integrations; device access and refresh tokens authorize users.
+servers:
+  - url: https://api.muse.ai
+paths:
+  /fetch_vms:
+    get:
+      operationId: FetchVms
+      summary: Fetch VMs accessible to an authorized device.
+      security:
+        - DeviceBearer: []
+      parameters:
+        - in: header
+          name: X-API-Version
+          schema:
+            type: string
+            default: 1.0.0
+      responses:
+        '200':
+          description: Device VM list or an application-level error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchVmsResponse'
+        '401':
+          description: Device access token was rejected. An SDK token is not a device token.
+        '403':
+          description: Access denied.
+        '429':
+          description: Rate limited. Do not retry without a bounded policy.
+  /device_token/refresh:
+    post:
+      operationId: RefreshDeviceToken
+      summary: Rotate a device access and refresh token pair.
+      description: >-
+        Requires a refresh bearer formatted as hatch_refresh:VALUE, never an access token.
+        The sdk_token body field identifies the integration and does not authorize the user.
+      security:
+        - DeviceRefreshBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshDeviceTokenRequest'
+      responses:
+        '200':
+          description: New token pair, possibly nested in payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshDeviceTokenResponse'
+        '401':
+          description: Refresh authorization rejected; user reauthorization is required.
+        '429':
+          description: Rate limited.
+components:
+  securitySchemes:
+    DeviceBearer:
+      type: http
+      scheme: bearer
+      description: Authorized device access token, not an mgst_ SDK token.
+    DeviceRefreshBearer:
+      type: http
+      scheme: bearer
+      description: Authorized device refresh token with one hatch_refresh prefix.
+  schemas:
+    MuseVm:
+      type: object
+      properties:
+        vm_id:
+          type: string
+        vm_name:
+          type: string
+        vm_ws_url:
+          type: string
+        vm_url:
+          type: string
+        vm_auth_token:
+          type: string
+          description: Sensitive session bearer. Never log or put in URLs.
+        default:
+          type: boolean
+    FetchVmsResponse:
+      type: object
+      properties:
+        vm_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/MuseVm'
+        error_title:
+          type: string
+        backend_error_code:
+          type: string
+    RefreshDeviceTokenRequest:
+      type: object
+      required: [device_id]
+      properties:
+        device_id:
+          type: string
+        sdk_token:
+          type: string
+          description: Sensitive integration token.
+    DeviceTokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+    RefreshDeviceTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        payload:
+          $ref: '#/components/schemas/DeviceTokenPair'
