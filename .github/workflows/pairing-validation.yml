@@ -1,0 +1,33 @@
+name: Pairing validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/libs/**'
+      - 'src/tests/IntegrationTests/PairingSessionTests.cs'
+      - 'src/tests/PairingNativeAot/**'
+      - '.github/workflows/pairing-validation.yml'
+  pull_request:
+    paths:
+      - 'src/libs/**'
+      - 'src/tests/IntegrationTests/PairingSessionTests.cs'
+      - 'src/tests/PairingNativeAot/**'
+      - '.github/workflows/pairing-validation.yml'
+permissions:
+  contents: read
+jobs:
+  pairing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Published pairing vector and enrollment state tests
+        run: dotnet test Muse.slnx -c Release --filter FullyQualifiedName~PairingSessionTests
+      - name: Compile NativeAOT pairing harness
+        run: dotnet publish src/tests/PairingNativeAot/PairingNativeAot.csproj -c Release -r linux-x64 -o artifacts/pairing-nativeaot -p:GeneratePackageOnBuild=false
+      - name: Execute NativeAOT encrypted enrollment fixture
+        run: artifacts/pairing-nativeaot/PairingNativeAot
