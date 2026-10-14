@@ -18,6 +18,8 @@ jobs:
           python-version: '3.12'
       - name: Unit and HTTP contract tests
         run: dotnet test Muse.slnx -c Release --filter 'TestCategory!=Live&TestCategory!=LiveProbe&TestCategory!=Interop'
+      - name: Authentication diagnostic regression tests
+        run: python3 scripts/test-auth-diagnostics.py
       - name: Independent protocol interoperability
         run: bash scripts/test-interop.sh
       - name: NativeAOT build

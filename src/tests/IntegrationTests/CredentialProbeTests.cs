@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 
 namespace Muse.IntegrationTests;
 
@@ -10,17 +11,29 @@ public sealed class CredentialProbeTests
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    public async Task SdkTokenDeviceApiAccessProbe()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SdkTokenDeviceApiAccessProbe(bool matchPythonHeaders)
     {
         var sdkToken = Environment.GetEnvironmentVariable("MUSE_SDK_TOKEN") is { Length: > 0 } value
             ? value : throw new AssertInconclusiveException("MUSE_SDK_TOKEN is required for the explicit live probe.");
         using var handler = new HttpClientHandler { AllowAutoRedirect = false };
         using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+        if (matchPythonHeaders)
+        {
+            var reportPath = Environment.GetEnvironmentVariable("MUSE_PYTHON_AUTH_REPORT") is { Length: > 0 } path
+                ? path : throw new AssertInconclusiveException("Run scripts/test-live.sh probe-sdk-token to obtain the Python header baseline.");
+            using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath));
+            http.DefaultRequestHeaders.UserAgent.ParseAdd(report.RootElement.GetProperty("userAgent").GetString()!);
+        }
+        TestContext.WriteLine("C# discovery headers: {0}.", matchPythonHeaders ? "matching Python User-Agent and X-API-Version" : "SDK defaults");
+        // The raw generated constructor is intentional in this negative diagnostic.
+        // Application examples use the role-aware factories instead.
         using var client = new MuseClient(sdkToken, httpClient: http, disposeHttpClient: false);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         try
         {
-            var response = await client.FetchVmsAsync(xApiVersion: "1.0.0", cancellationToken: deadline.Token);
+            var response = await client.FetchVmsAsync(cancellationToken: deadline.Token);
             // Never print provider bodies, VM identifiers, headers, or credential-bearing objects.
             TestContext.WriteLine("Live GET /fetch_vms: HTTP 200; credentials and response body redacted.");
             if (!string.IsNullOrEmpty(response.ErrorTitle) || !string.IsNullOrEmpty(response.BackendErrorCode))
@@ -31,7 +44,7 @@ public sealed class CredentialProbeTests
         catch (ApiException exception) when (exception.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
             TestContext.WriteLine("Live GET /fetch_vms: HTTP {0}; response body redacted.", (int)exception.StatusCode);
-            Assert.Inconclusive($"SDK-token-only authorization was rejected (HTTP {(int)exception.StatusCode}); authorized device credentials are still required. No live chat was exercised.");
+            Assert.Inconclusive($"SDK-token-only authorization was rejected (HTTP {(int)exception.StatusCode}); this does not test whether the token is valid for gadget pairing. Separate account authorization remains unverified. No live chat was exercised.");
         }
         catch (ApiException exception)
         {

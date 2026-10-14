@@ -6,10 +6,11 @@ try
 {
     // Synthetic HTTP verifies the generated client with reflection disabled.
     using var http = new HttpClient(new FixtureHandler());
-    using var api = new MuseClient("fixture-only", httpClient: http, disposeHttpClient: false);
-    var vms = await api.FetchVmsAsync(xApiVersion: "1.0.0");
+    using var api = MuseClient.ForDeviceAccessToken("fixture-only", httpClient: http, disposeHttpClient: false);
+    var vms = await api.FetchVmsAsync();
     if (vms.VmList?.Count != 1) throw new InvalidOperationException("Unexpected fixture VM response.");
-    var rotated = await api.RefreshDeviceTokenAsync("fixture-device", sdkToken: "fixture-sdk");
+    using var refresh = MuseClient.ForDeviceRefreshToken("hatch_refresh:fixture-refresh", httpClient: http, disposeHttpClient: false);
+    var rotated = await refresh.RefreshDeviceTokenAsync("fixture-device", sdkToken: "fixture-sdk");
     if (rotated.Payload?.AccessToken != "fixture-access") throw new InvalidOperationException("Unexpected fixture refresh response.");
 
     // The oracle launcher removes all provider credentials from this process.
@@ -49,7 +50,13 @@ internal sealed class FixtureHandler : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var body = request.RequestUri!.AbsolutePath == "/fetch_vms"
+        var discovery = request.RequestUri!.AbsolutePath == "/fetch_vms";
+        var expectedBearer = discovery ? "fixture-only" : "hatch_refresh:fixture-refresh";
+        if (request.Headers.Authorization?.Parameter != expectedBearer || request.Headers.UserAgent.Count == 0)
+            throw new InvalidOperationException("Incorrect authentication fixture headers.");
+        if (discovery && (!request.Headers.TryGetValues("X-API-Version", out var versions) || versions.Single() != "1.0.0"))
+            throw new InvalidOperationException("The default API version is missing.");
+        var body = discovery
             ? "{\"vm_list\":[{\"vm_id\":\"fixture-vm\"}]}"
             : "{\"payload\":{\"access_token\":\"fixture-access\",\"refresh_token\":\"fixture-refresh\"}}";
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)

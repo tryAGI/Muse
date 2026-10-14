@@ -15,9 +15,11 @@ public partial class Tests
     public async Task Example_DiscoverVms()
     {
         //// The SDK token identifies the integration; this request needs a device access token.
-        using var client = GetAuthenticatedClient();
+        var deviceToken = Environment.GetEnvironmentVariable("MUSE_DEVICE_ACCESS_TOKEN") is { Length: > 0 } value
+            ? value : throw new AssertInconclusiveException("MUSE_DEVICE_ACCESS_TOKEN is required.");
+        using var client = MuseClient.ForDeviceAccessToken(deviceToken);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var response = await client.FetchVmsAsync(xApiVersion: "1.0.0", cancellationToken: timeout.Token);
+        var response = await client.FetchVmsAsync(cancellationToken: timeout.Token);
         response.VmList.Should().NotBeNull();
         //// VM bearer credentials are sensitive. Do not print the response or copy it into logs.
     }

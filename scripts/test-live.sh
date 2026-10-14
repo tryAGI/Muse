@@ -14,9 +14,16 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 case "${1:-live}" in
   live) FILTER='TestCategory=Live' ;;
-  probe-sdk-token) FILTER='TestCategory=LiveProbe' ;;
+  probe-sdk-token)
+    FILTER='TestCategory=LiveProbe'
+    python3 "$ROOT/scripts/probe-python-auth.py" --live
+    export MUSE_PYTHON_AUTH_REPORT="$ROOT/artifacts/auth-python.json"
+    ;;
   *) printf 'Usage: bash scripts/test-live.sh [live|probe-sdk-token]\n' >&2; exit 2 ;;
 esac
+mkdir -p "$ROOT/artifacts"
+RESULTS="$(mktemp -d "$ROOT/artifacts/live-auth-XXXXXX")"
 printf 'Running the selected live test; credentials remain redacted.\n'
 dotnet test "$ROOT/Muse.slnx" -c Release --no-build --no-restore --filter "$FILTER" \
-  --logger 'console;verbosity=normal' --logger 'trx;LogFileName=live.trx'
+  --results-directory "$RESULTS" --logger 'console;verbosity=normal' --logger 'trx;LogFileName=live.trx'
+python3 "$ROOT/scripts/check-live-results.py" "$RESULTS/live.trx"

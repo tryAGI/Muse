@@ -36,15 +36,15 @@ Until a prerelease is available, build `src/libs/Muse/Muse.csproj` from this rep
 using Muse;
 
 // Obtain this through an authorized user/device flow, not from an SDK token.
-var deviceToken = Environment.GetEnvironmentVariable("MUSE_DEVICE_ACCESS_TOKEN")
-    ?? throw new InvalidOperationException("A device access token is required.");
-using var client = new MuseClient(deviceToken);
+var deviceToken = Environment.GetEnvironmentVariable("MUSE_DEVICE_ACCESS_TOKEN") is { Length: > 0 } value
+    ? value : throw new InvalidOperationException("A device access token is required.");
+using var client = MuseClient.ForDeviceAccessToken(deviceToken);
 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-var vms = await client.FetchVmsAsync(xApiVersion: "1.0.0", cancellationToken: deadline.Token);
+var vms = await client.FetchVmsAsync(cancellationToken: deadline.Token);
 // VM responses contain credentials. Never log the response object.
 ```
 
-For refresh, use a **separate** client with an explicitly authorized `hatch_refresh:<refresh-token>` bearer and `RefreshDeviceTokenAsync(deviceId, sdkToken: sdkToken, cancellationToken: token)`. A response can contain the pair directly or under `Payload`; validate both non-empty replacement tokens before atomically persisting either. Do not reuse an access-token client for refresh, blindly retry rotation, or overwrite valid credentials after a failed request.
+For refresh, use a **separate** client created with `MuseClient.ForDeviceRefreshToken(deviceRefreshToken)` and call `RefreshDeviceTokenAsync(deviceId, sdkToken: sdkToken, cancellationToken: token)`. The factory normalizes the `hatch_refresh:` prefix exactly once; the SDK token belongs in the JSON body. The role-aware factories reject SDK tokens as device credentials locally, without printing their values. These checks are not provider token validation or initial account login. The low-level generated constructor remains available for explicit raw API use and negative diagnostics. `X-API-Version: 1.0.0` and the SDK User-Agent are supplied automatically; caller overrides are preserved. A response can contain the pair directly or under `Payload`; validate both non-empty replacement tokens before atomically persisting either. Do not reuse an access-token client for refresh, blindly retry rotation, or overwrite valid credentials after a failed request.
 
 ## Encrypted connection
 
@@ -86,7 +86,7 @@ bash scripts/test-interop.sh artifacts/nativeaot/NativeAotSmoke
 
 Use `osx-arm64` on Apple Silicon. The oracle is development-only, binds an ephemeral loopback port, uses synthetic credentials, and removes provider credentials from child processes. It downloads only the pinned upstream protocol revision.
 
-Live tests are explicit: `bash scripts/test-live.sh live` requires separately authorized device credentials. `bash scripts/test-live.sh probe-sdk-token` performs one bounded diagnostic discovery request with the SDK token; a rejected credential is reported as inconclusive, **not successful E2E**. Put temporary values only in an ignored local `.env` based on `.env.example`, with owner-only permissions. Never commit credentials or log API exception bodies.
+Live tests are explicit: `bash scripts/test-live.sh live` requires separately authorized device credentials. `bash scripts/test-live.sh probe-sdk-token` performs three bounded discovery measurements: the pinned upstream Python function, the generated C# client with SDK defaults, and C# with matching Python User-Agent/API-version headers. Python uses a clearly labeled diagnostic package-version string, not a full gadget installation. A rejected credential remains inconclusive, **not successful E2E**, and the wrapper exits with code **3** if any selected live test was skipped or none ran. The most recent comparison returned **401 / 401 / 401**; this does not validate or invalidate the token for its intended pairing role. The Python probe requires `gh` for a hash-verified public source read and is development-only. Put temporary values only in an ignored local `.env` based on `.env.example`, with owner-only permissions. Never commit credentials or log API exception bodies.
 
 Regenerate with `bash src/libs/Muse/generate.sh`; never edit `Generated/`. Documentation examples are generated with `dotnet tool run autosdk docs sync .` from integration-test examples.
 
@@ -96,9 +96,11 @@ Discover VMs using a separately authorized device access token.
 
 ```csharp
 // The SDK token identifies the integration; this request needs a device access token.
-using var client = new MuseClient(apiKey);
+var deviceToken = Environment.GetEnvironmentVariable("MUSE_DEVICE_ACCESS_TOKEN") is { Length: > 0 } value
+    ? value : throw new AssertInconclusiveException("MUSE_DEVICE_ACCESS_TOKEN is required.");
+using var client = MuseClient.ForDeviceAccessToken(deviceToken);
 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-var response = await client.FetchVmsAsync(xApiVersion: "1.0.0", cancellationToken: timeout.Token);
+var response = await client.FetchVmsAsync(cancellationToken: timeout.Token);
 // VM bearer credentials are sensitive. Do not print the response or copy it into logs.
 ```
 <!-- EXAMPLES:END -->

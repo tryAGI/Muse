@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 artifacts/
+__pycache__/
+*.pyc
 .tools/
 
 ## Ignore Visual Studio temporary files, build results, and

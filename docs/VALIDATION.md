@@ -1,6 +1,37 @@
 # Network validation — 2026-10-05
 
-## Result
+## Authentication follow-up — 2026-10-05 17:29 UTC
+
+The supplied SDK token was confirmed equal to the existing local secret without publishing either its value or fingerprint. The file remains ignored and owner-readable only. No whitespace or encoding change was observed.
+
+| Probe | Observed result |
+|---|---|
+| Published Python `fetch_vms_with_status` | HTTP 401; no VMs |
+| Generated C# client with corrected default headers | HTTP 401 |
+| Generated C# with the same Python User-Agent and API-version header | HTTP 401 |
+| SDK token validity for its intended gadget-pairing role | Not established by these discovery probes |
+| Authenticated real Muse conversation | Still not exercised |
+
+Python executed the unmodified API module at upstream revision `74a5e2d7fc895f109f83a9a1dbed705dbcd8b1ff`, Git blob `d93e1fffdfdbb415720577c3ee1aaa8186d3d786`. Only the package-version import was supplied as `auth-diagnostic` to avoid installing BLE/device-executor dependencies. The emitted User-Agent was `musegadget/auth-diagnostic (Darwin arm64) Python/3.14.7`; C# used that exact value in the parity measurement. Both used `Authorization: Bearer <SDK token>`, `X-API-Version: 1.0.0`, normal TLS validation and disabled redirects. No response bodies or credentials were logged.
+
+This reproduces the rejection across languages and with the inspected headers aligned. It is not proof that an arbitrary other header can never matter, nor that the integration token is revoked. The published API function expects a device access token. Its refresh function uses a separate `hatch_refresh:` bearer and puts `sdk_token` in the JSON body; it does not exchange an SDK token alone for a signed-in user's credentials. The [SDK-token portal](https://gadgets.muse.ai/settings/sdk-tokens) describes the token as enabling gadget pairing with the Muse app. Initial backend-only account authorization remains tracked in [issue #2](https://github.com/tryAGI/Muse/issues/2).
+
+### Fixed in the authentication follow-up
+
+- The documented default API-version header is now actually applied when the caller omits the optional argument. A default SDK User-Agent is added without replacing a caller's value or mutating shared HttpClient headers. The original live probe already supplied the API version explicitly, so this fix does not explain its earlier 401.
+- `MuseClient.ForDeviceAccessToken` and `ForDeviceRefreshToken` provide role-aware construction. SDK tokens and malformed credentials are rejected locally without leaking their values; refresh prefixes are normalized exactly once. These are local validation helpers, not token minting or provider-side validity checks. The raw generated constructor remains an explicitly low-level API.
+- The live wrapper no longer reports success when the selected tests are skipped/inconclusive, missing or empty. The parity run produced two inconclusive C# results and correctly returned exit code 3.
+- Live examples and the NativeAOT smoke now use the role-aware factories and separate access/refresh clients.
+
+### Follow-up verification
+
+- macOS: 33 offline C# tests passed with no skipped tests; build completed with no C# warnings/errors. Two Python gate tests covered nine result-report cases and passed.
+- A broader local validation command timed out during the redundant build before interoperability started. One no-build retry then timed out waiting for the loopback WebSocket HTTP upgrade. These local network reruns are **not passing evidence**; their cause is not established. No encrypted-transport implementation was changed in this follow-up.
+- The updated NativeAOT smoke and independent network checks are included in Linux CI. Their new run must be checked separately; the successful historical baseline below is not a substitute for that run.
+
+Reproduce the bounded language/header comparison with `bash scripts/test-live.sh probe-sdk-token`. `artifacts/auth-python.json` and the fresh `artifacts/live-auth-*/live.trx` contain sanitized local observations. The temporary token stays outside source, GitHub Actions and public issue content.
+
+## Initial network baseline (commit 2d72741)
 
 The C# network implementation is suitable for further isolated integration work. **It is not a completed authenticated Muse E2E or a production security certification.** No Advantage application, microphone, speech provider, BLE pairing, or remote tool executor was enabled.
 
