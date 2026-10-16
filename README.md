@@ -7,6 +7,8 @@
 
 **Account bootstrap is not implemented or proven.** A Gadget SDK token (`mgst_...`) identifies the integration; it is not a device access token, refresh token, or VM bearer. The bounded live SDK-token-only probe returned **HTTP 401** from `/fetch_vms` on 2026-10-05. No live Muse conversation or real token rotation has passed yet. Local interoperability results must not be interpreted as provider E2E.
 
+See [account availability and live validation](AVAILABILITY.md) for dated official regional statements, missing credential roles, and the remaining completion criteria.
+
 ## What is implemented
 
 | Layer | Support |
